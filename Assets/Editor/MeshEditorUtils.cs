@@ -1,14 +1,31 @@
 ﻿using MeshOptimizer;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-public static class MeshEditorUtils
+public interface IMeshOpt
 {
+    void Init(Mesh mesh);
+    Mesh Simplify(int percent);
+    Mesh Optimize();
+}
 
-    [MenuItem("Assets/convert")]
+public static partial class MeshEditorUtils
+{
+    [MenuItem("Assets/mesh/(danger)OptimAndReplace")]
+    private static void Editor_ConvMeshReplace()
+    {
+        var mesh = Selection.gameObjects.Where(t => (AssetDatabase.LoadAssetAtPath<Mesh>(AssetDatabase.GetAssetPath(t)) != null)).FirstOrDefault();
+        if (mesh != null)
+        {
+            OptMeshFileReplace(AssetDatabase.GetAssetPath(mesh));
+        }
+    }
+
+    [MenuItem("Assets/mesh/convert")]
     private static void Editor_ConvMesh()
     {
 
@@ -19,10 +36,9 @@ public static class MeshEditorUtils
         }
     }
 
-    [MenuItem("Assets/SimplifyMesh")]
+    [MenuItem("Assets/mesh/SimplifyMesh")]
     private static void Editor_SimpleMesh()
     {
-
         var mesh = Selection.gameObjects.Where(t => (AssetDatabase.LoadAssetAtPath<Mesh>(AssetDatabase.GetAssetPath(t)) != null)).FirstOrDefault();
         if (mesh != null)
         {
@@ -34,89 +50,59 @@ public static class MeshEditorUtils
     {
         var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
         var fileName = System.IO.Path.GetFileNameWithoutExtension(path);
-        (var newVertex, var newIndics) = OptMeshData(mesh);
-        var newMesh = SimplifyMesh(newVertex,newIndics, 75);
+        var simpleMeshEditor = new SimpleMeshOpt();
+        simpleMeshEditor.Init(mesh);
+
+        var newMesh = simpleMeshEditor.Simplify(75);
         AssetDatabase.CreateAsset(newMesh, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_075.mesh");
 
-        var newMesh2 = SimplifyMesh(newVertex, newIndics, 50);
+        var newMesh2 = simpleMeshEditor.Simplify(50);
         AssetDatabase.CreateAsset(newMesh2, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_050.mesh");
 
-        var newMesh3 = SimplifyMesh(newVertex, newIndics, 25);
+        var newMesh3 = simpleMeshEditor.Simplify(25);
         AssetDatabase.CreateAsset(newMesh3, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_025.mesh");
-    }
-
-    private static Mesh SimplifyMesh(Vector3[] vertex, uint[] indices, int percent)
-    {
-        var newSimpleIndics = MeshOperations.Simplify(indices, vertex, sizeof(float) * 3, (uint)(indices.Length * percent / 100.0f), 0.01f, 0, out var error);
-        var newMesh = new Mesh();
-
-        newMesh.SetVertices(vertex);
-        newMesh.SetIndices(newSimpleIndics.Select(t => (int)t).ToArray(), MeshTopology.Triangles, 0);
-        newMesh.RecalculateNormals();
-        return newMesh;
-    }
-
-    private static Mesh SimplifyMesh(Mesh mesh, int percent)
-    {
-        (var newVertex, var newIndics) = OptMeshData(mesh);
-
-
-        var newSimpleIndics = MeshOperations.Simplify(newIndics, newVertex, sizeof(float) * 3, (uint)(newIndics.Length * percent / 100.0f), 0.01f, 0, out var error);
-        var newMesh = new Mesh();
-
-        newMesh.SetVertices(newVertex);
-        newMesh.SetIndices(newSimpleIndics.Select(t => (int)t).ToArray(), MeshTopology.Triangles, 0);
-        newMesh.RecalculateNormals();
-        return newMesh;
     }
 
     private static void OptMeshFile(string path)
     {
         var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
         var fileName = System.IO.Path.GetFileNameWithoutExtension(path);
-        var newMesh = OptMesh2(mesh);
-        AssetDatabase.CreateAsset(newMesh, System.IO.Path.GetDirectoryName(path) + $"\\ {fileName} _fixed.mesh");
+
+        var simpleMeshEditor = new SimpleMeshOpt();
+        simpleMeshEditor.Init(mesh);
+        var newMesh = simpleMeshEditor.Optimize();
+        AssetDatabase.CreateAsset(newMesh, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_fixed.mesh");
     }
 
-    public static Mesh OptMesh2(Mesh mesh)
+    private static void OptMeshFileReplace(string path)
     {
-        (var newVertex, var newIndics) = OptMeshData(mesh);
+        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+        var fileName = System.IO.Path.GetFileNameWithoutExtension(path);
 
-        var newMesh = new Mesh();
-        newMesh.SetVertices(newVertex);
-        newMesh.SetIndices(newIndics.Select(t => (int)t).ToArray(), MeshTopology.Triangles, 0);
-        newMesh.RecalculateNormals();
-        return newMesh;
+        var simpleMeshEditor = new SimpleMeshOpt();
+        simpleMeshEditor.Init(mesh);
+        var newMesh = simpleMeshEditor.Optimize();
+        mesh.Clear();
+        mesh.SetVertices(newMesh.vertices.ToList());
+        mesh.SetIndices(newMesh.GetIndices(0).Select(t=>(int)t).ToArray(), MeshTopology.Triangles, 0);
+        mesh.RecalculateNormals();
+        EditorUtility.SetDirty(mesh);
+        AssetDatabase.Refresh();
     }
 
-    public static (Vector3[] vertex, uint[] indices) OptMeshData(Mesh mesh)
+
+    public static (T[] vertex, uint[] indices) OptMeshData<T>(Mesh mesh, T[] originList ,uint sizeOfT) where T : struct
     {
-        var vertices = new List<Vector3>();
-        mesh.GetVertices(vertices);
+        var vertices = new List<T>(originList);
         var indics = mesh.GetIndices(0).Select(t => (uint)t).ToArray();
 
         //remapVertexBuff
         //remapIndicsBuff
-        (var newVertex, var newIndics) = MeshOperations.Reindex(vertices.ToArray(), indics, (uint)(sizeof(float) * 3));
+        (var newVertex, var newIndics) = MeshOperations.Reindex(vertices.ToArray(), indics, sizeOfT);
 
         MeshOperations.OptimizeCache(newIndics, newVertex.Length);
-        MeshOperations.OptimizeOverdraw(newIndics, newVertex, sizeof(float) * 3, 1.2f);
-        MeshOperations.OptimizeVertexFetch(newIndics, newVertex, sizeof(float) * 3);
+        MeshOperations.OptimizeOverdraw(newIndics, newVertex, sizeOfT, 1.2f);
+        MeshOperations.OptimizeVertexFetch(newIndics, newVertex, sizeOfT);
         return (newVertex, newIndics);
-    }
-
-    public static Mesh OptMesh(Mesh mesh)
-    {
-        var vetex = new List<Vector3>();
-        mesh.GetVertices(vetex);
-        var indics = mesh.GetIndices(0).Select(t => (uint)t).ToArray();
-
-        var result = MeshOperations.Optimize<Vector3>(vetex.ToArray(), indics, (uint)(sizeof(float) * 3));
-
-        var newMesh = new Mesh();
-        newMesh.SetVertices(result.Item1);
-        newMesh.SetIndices(result.Item2.Select(t => (int)t).ToArray(), MeshTopology.Triangles, 0);
-        newMesh.RecalculateNormals();
-        return newMesh;
     }
 }
