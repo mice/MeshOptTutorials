@@ -115,12 +115,13 @@ public class SkinMeshOpt : IMeshOpt
         var tmpArray = new int[newVertex.Length];
         for (int i = 0; i < newVertex.Length; i++)
         {
-            tmpArray[i] = originVertex.IndexOf(newVertex[i]);
+            var tIndex = originVertex.IndexOf(newVertex[i]);
+            tmpArray[i] = tIndex;
             if (tmpArray[i] != -1)
             {
-                var startIndex = indexStartList[i];
+                var startIndex = indexStartList[tIndex];
                 var totalWeight = 0.0f;
-                for (int j = 0; j < originVertex[i].VertexByte; j++)
+                for (int j = 0; j < newVertex[i].VertexByte; j++)
                 {
                     newBoneWeights.Add(originWeight[startIndex + j]);
                     totalWeight += originWeight[startIndex + j].weight;
