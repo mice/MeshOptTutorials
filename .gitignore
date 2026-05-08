@@ -8,5 +8,9 @@
 /UserSettings
 /.vsconfig
 /Assembly-CSharp-Editor.csproj
-/Packages
+/Packages/com.autodesk.fbx@4.1.2
+/Packages/packages-lock.json
 /Temp
+/Assets/raw_temp.meta
+/Assets/raw_temp
+/ART_SVN

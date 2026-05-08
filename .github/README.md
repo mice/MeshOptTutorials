@@ -77,6 +77,8 @@ This section records only the cases that still matter **inside the current suppo
 
 The goal is to focus follow-up work on the real remaining deformation risks, and avoid spending time on out-of-scope cases.
 
+Important: the cases below are a risk analysis inferred from the current implementation and common skinned-mesh failure modes. They are not a substitute for per-asset animation QA or measured deformation benchmarks. Priority labels are therefore triage guidance, not a formal severity ranking.
+
 Current pipeline:
 
 1. `SkinMeshOpt.Simplify(...)` snapshots bind-pose vertex data into `SimpleSkinData`
@@ -95,7 +97,7 @@ Important: this document intentionally ignores UV1/lightmap concerns. The focus 
 - Why it happens: `meshopt_simplify(...)` evaluates simplification from bind-pose vertex positions; it does not evaluate the same area under animated poses
 - Why this matters: these are the exact areas where geometric error in bind pose is a poor predictor of runtime deformation quality
 - Improvement direction: evaluate simplification error on sampled poses/clips, or add a skinning-aware metric that penalizes collapses across highly deforming joints
-- Priority: **high**
+- Priority: **high** (inferred from deformation behavior)
 
 #### Case A2 - Twist / roll bone chains
 
@@ -104,7 +106,7 @@ Important: this document intentionally ignores UV1/lightmap concerns. The focus 
 - Why it happens: the simplifier does not understand rotational deformation driven by twist chains; it only sees static positions
 - Why this matters: twist chains often require extra topology density even when the bind pose appears visually simple
 - Improvement direction: add pose sampling for twist-heavy clips and preserve density in regions with large rotational deformation
-- Priority: **high**
+- Priority: **high** (inferred from deformation behavior)
 
 #### Case A3 - Stretch-heavy deformation regions
 
@@ -113,7 +115,7 @@ Important: this document intentionally ignores UV1/lightmap concerns. The focus 
 - Why it happens: simplification is decided before those areas are observed in stretched poses
 - Why this matters: an area that is compact in bind pose may become visually important only during motion
 - Improvement direction: score the mesh across a set of representative extreme poses instead of bind pose only
-- Priority: **high**
+- Priority: **high** (inferred from deformation behavior)
 
 #### Case A4 - Hard bone-weight boundaries
 
@@ -122,7 +124,7 @@ Important: this document intentionally ignores UV1/lightmap concerns. The focus 
 - Why it happens: the algorithm keeps bone weights after simplification, but the triangle removal decision itself is still position-driven and not weight-gradient-aware
 - Why this matters: even if weights are copied back correctly, the reduced topology may no longer support the intended deformation boundary
 - Improvement direction: add a penalty for simplifying across strong bone-weight gradients, or preserve protected regions near weight discontinuities
-- Priority: **medium**
+- Priority: **medium** (inferred from deformation behavior)
 
 #### Case A5 - Over-aggressive reduction ratios
 
@@ -131,7 +133,7 @@ Important: this document intentionally ignores UV1/lightmap concerns. The focus 
 - Why it happens: a bind-pose-driven simplifier becomes much less predictable as reduction becomes more aggressive
 - Why this matters: even within supported assets, the largest visible failures often come from using an overly strong reduction level instead of from a coding bug
 - Improvement direction: keep conservative presets first, and evaluate 75% / 50% before enabling 25% broadly
-- Priority: **medium**
+- Priority: **medium** (policy / QA guidance)
 
 ### Group B - Out-of-scope cases under the current product boundary
 
@@ -167,7 +169,13 @@ Important: this document intentionally ignores UV1/lightmap concerns. The focus 
 
 ## Practical Conclusion
 
-The current `Assets/skin/SimplifyMesh` path should be treated as a constrained **character / monster LOD tool**.
+The current `Assets/skin/SimplifyMesh` path should be treated as a constrained **character / monster LOD tool**, not as a general skinned-mesh simplifier.
+
+Code-review conclusion:
+
+- the hard input boundary is already enforced in code, so Group B should stay out of the implementation backlog
+- the real technical risk is pose-dependent deformation quality under reduction, especially around joints, twist chains, stretch regions, and strong weight boundaries
+- the right next step is not broader format support, but better validation of supported assets and more conservative reduction policy for high-risk regions
 
 The main remaining work should stay focused on **Group A**:
 
