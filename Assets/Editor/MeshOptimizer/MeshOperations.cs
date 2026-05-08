@@ -125,5 +125,17 @@ namespace MeshOptimizer
             Array.Copy(newIdx, newIdx2, newSize);
             return newIdx2;
         }
+        //工作有点奇怪,
+        public static uint[] GenerateShadowIndexBuffer<T>(uint[] Indices, T[] Vertices, uint VertexSize,uint VertexStride)
+        {
+            var newIdx = new uint[(int)(Indices.Length)];
+            var idxPointer = Pointer.Create(newIdx);
+            var pointer = Pointer.Create(Vertices);
+            MeshOptimizerNative.GenerateShadowIndexBuffer(idxPointer.Address, Indices, (UIntPtr)Indices.Length, pointer.Address, (UIntPtr)Vertices.Length, (UIntPtr)VertexSize,
+                (UIntPtr)VertexStride);
+            pointer.Free();
+            idxPointer.Free();
+            return newIdx;
+        }
     }
 }

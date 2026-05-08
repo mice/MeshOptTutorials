@@ -1,7 +1,7 @@
 ﻿using MeshOptimizer;
 using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -11,6 +11,8 @@ public interface IMeshOpt
     void Init(Mesh mesh);
     Mesh Simplify(int percent);
     Mesh Optimize();
+
+    Mesh MergeLOD();
 }
 
 public static partial class MeshEditorUtils
@@ -18,75 +20,87 @@ public static partial class MeshEditorUtils
     [MenuItem("Assets/mesh/(danger)OptimAndReplace")]
     private static void Editor_ConvMeshReplace()
     {
-        var mesh = Selection.gameObjects.Where(t => (AssetDatabase.LoadAssetAtPath<Mesh>(AssetDatabase.GetAssetPath(t)) != null)).FirstOrDefault();
-        if (mesh != null)
+        if (TryGetSelectedMeshAsset(out var mesh, out var path) &&
+            ValidateMeshForProcessing(mesh, path) &&
+            EnsureReplaceSupported(path))
         {
-            OptMeshFileReplace(AssetDatabase.GetAssetPath(mesh));
+            OptMeshFileReplace(mesh, path);
         }
     }
 
     [MenuItem("Assets/mesh/convert")]
     private static void Editor_ConvMesh()
     {
-
-        var mesh = Selection.gameObjects.Where(t => (AssetDatabase.LoadAssetAtPath<Mesh>(AssetDatabase.GetAssetPath(t)) != null)).FirstOrDefault();
-        if (mesh != null)
+        if (TryGetSelectedMeshAsset(out var mesh, out var path) &&
+            ValidateMeshForProcessing(mesh, path))
         {
-            OptMeshFile(AssetDatabase.GetAssetPath(mesh));
+            OptMeshFile(mesh, path);
         }
     }
 
     [MenuItem("Assets/mesh/SimplifyMesh")]
     private static void Editor_SimpleMesh()
     {
-        var mesh = Selection.gameObjects.Where(t => (AssetDatabase.LoadAssetAtPath<Mesh>(AssetDatabase.GetAssetPath(t)) != null)).FirstOrDefault();
-        if (mesh != null)
+        if (TryGetSelectedMeshAsset(out var mesh, out var path) &&
+            ValidateMeshForProcessing(mesh, path))
         {
-            SimplifyMeshFile(AssetDatabase.GetAssetPath(mesh));
+            SimplifyMeshFile(mesh, path);
         }
     }
 
-    private static void SimplifyMeshFile(string path)
+    [MenuItem("Assets/mesh/Shadow")]
+    private static void Editor_MakeShadowMesh()
     {
-        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-        var fileName = System.IO.Path.GetFileNameWithoutExtension(path);
+        if (TryGetSelectedMeshAsset(out var mesh, out var path) &&
+            ValidateMeshForProcessing(mesh, path))
+        {
+            ShadowMeshFile(mesh, path);
+        }
+    }
+
+    private static void ShadowMeshFile(Mesh mesh, string path)
+    {
+        var simpleMeshEditor = new SimpleMeshOpt();
+        simpleMeshEditor.Init(mesh);
+
+        var newMesh = simpleMeshEditor.MergeLOD();
+        AssetDatabase.CreateAsset(newMesh, BuildGeneratedMeshPath(path, "_lod"));
+    }
+
+
+    private static void SimplifyMeshFile(Mesh mesh, string path)
+    {
         var simpleMeshEditor = new SimpleMeshOpt();
         simpleMeshEditor.Init(mesh);
 
         var newMesh = simpleMeshEditor.Simplify(75);
-        AssetDatabase.CreateAsset(newMesh, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_075.mesh");
+        AssetDatabase.CreateAsset(newMesh, BuildGeneratedMeshPath(path, "_075"));
 
         var newMesh2 = simpleMeshEditor.Simplify(50);
-        AssetDatabase.CreateAsset(newMesh2, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_050.mesh");
+        AssetDatabase.CreateAsset(newMesh2, BuildGeneratedMeshPath(path, "_050"));
 
         var newMesh3 = simpleMeshEditor.Simplify(25);
-        AssetDatabase.CreateAsset(newMesh3, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_025.mesh");
+        AssetDatabase.CreateAsset(newMesh3, BuildGeneratedMeshPath(path, "_025"));
     }
 
-    private static void OptMeshFile(string path)
-    {
-        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-        var fileName = System.IO.Path.GetFileNameWithoutExtension(path);
 
+
+    private static void OptMeshFile(Mesh mesh, string path)
+    {
         var simpleMeshEditor = new SimpleMeshOpt();
         simpleMeshEditor.Init(mesh);
         var newMesh = simpleMeshEditor.Optimize();
-        AssetDatabase.CreateAsset(newMesh, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_fixed.mesh");
+        AssetDatabase.CreateAsset(newMesh, BuildGeneratedMeshPath(path, "_fixed"));
     }
 
-    private static void OptMeshFileReplace(string path)
+    private static void OptMeshFileReplace(Mesh mesh, string path)
     {
-        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-        var fileName = System.IO.Path.GetFileNameWithoutExtension(path);
-
         var simpleMeshEditor = new SimpleMeshOpt();
         simpleMeshEditor.Init(mesh);
         var newMesh = simpleMeshEditor.Optimize();
-        mesh.Clear();
-        mesh.SetVertices(newMesh.vertices.ToList());
-        mesh.SetIndices(newMesh.GetIndices(0).Select(t=>(int)t).ToArray(), MeshTopology.Triangles, 0);
-        mesh.RecalculateNormals();
+        CopyMesh(mesh, newMesh);
         EditorUtility.SetDirty(mesh);
+        AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
     }
 
@@ -104,5 +118,163 @@ public static partial class MeshEditorUtils
         MeshOperations.OptimizeOverdraw(newIndics, newVertex, sizeOfT, 1.2f);
         MeshOperations.OptimizeVertexFetch(newIndics, newVertex, sizeOfT);
         return (newVertex, newIndics);
+    }
+
+    private static bool TryGetSelectedMeshAsset(out Mesh mesh, out string assetPath)
+    {
+        mesh = Selection.activeObject as Mesh;
+        if (mesh != null)
+        {
+            assetPath = AssetDatabase.GetAssetPath(mesh);
+            return true;
+        }
+
+        assetPath = AssetDatabase.GetAssetPath(Selection.activeObject);
+        if (string.IsNullOrEmpty(assetPath))
+        {
+            Debug.LogError("Select a Mesh asset in the Project window.");
+            return false;
+        }
+
+        var meshes = AssetDatabase.LoadAllAssetsAtPath(assetPath).OfType<Mesh>().ToArray();
+        if (meshes.Length == 1)
+        {
+            mesh = meshes[0];
+            return true;
+        }
+
+        if (meshes.Length > 1)
+        {
+            Debug.LogError($"Asset '{assetPath}' contains multiple meshes. Select the specific Mesh sub-asset instead.");
+            return false;
+        }
+
+        Debug.LogError("Select a Mesh asset in the Project window.");
+        return false;
+    }
+
+    private static bool ValidateMeshForProcessing(Mesh mesh, string assetPath)
+    {
+        if (mesh == null || string.IsNullOrEmpty(assetPath))
+        {
+            Debug.LogError("Failed to resolve the selected mesh asset.");
+            return false;
+        }
+
+        if (mesh.subMeshCount != 1)
+        {
+            Debug.LogError($"Only single-submesh meshes are supported. '{assetPath}' has {mesh.subMeshCount} submeshes.");
+            return false;
+        }
+
+        if (!mesh.isReadable)
+        {
+            Debug.LogError($"Mesh read/write must be enabled before running these tools. '{assetPath}' is not readable.");
+            return false;
+        }
+
+        if (mesh.GetTopology(0) != MeshTopology.Triangles)
+        {
+            Debug.LogError($"Only triangle meshes are supported. '{assetPath}' uses {mesh.GetTopology(0)}.");
+            return false;
+        }
+
+        if (mesh.blendShapeCount > 0)
+        {
+            Debug.LogError($"Meshes with blend shapes are not supported yet. '{assetPath}' has {mesh.blendShapeCount} blend shapes.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool EnsureReplaceSupported(string assetPath)
+    {
+        if (!string.Equals(Path.GetExtension(assetPath), ".mesh", StringComparison.OrdinalIgnoreCase))
+        {
+            Debug.LogError($"OptimAndReplace only supports native .mesh assets. Use convert to create a new mesh for '{assetPath}'.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string BuildGeneratedMeshPath(string sourcePath, string suffix)
+    {
+        var directory = Path.GetDirectoryName(sourcePath)?.Replace("\\", "/");
+        var fileName = Path.GetFileNameWithoutExtension(sourcePath);
+        return AssetDatabase.GenerateUniqueAssetPath($"{directory}/{fileName}{suffix}.mesh");
+    }
+
+    private static void CopyMesh(Mesh destination, Mesh source)
+    {
+        destination.Clear();
+        destination.name = source.name;
+        destination.indexFormat = source.indexFormat;
+        destination.vertices = source.vertices;
+
+        if (source.tangents.Length == source.vertexCount)
+        {
+            destination.tangents = source.tangents;
+        }
+
+        if (source.colors32.Length == source.vertexCount)
+        {
+            destination.colors32 = source.colors32;
+        }
+
+        for (var channel = 0; channel < 8; channel++)
+        {
+            var uvs = new List<Vector4>();
+            source.GetUVs(channel, uvs);
+            if (uvs.Count > 0)
+            {
+                destination.SetUVs(channel, uvs);
+            }
+        }
+
+        if (source.bindposes.Length > 0)
+        {
+            destination.bindposes = source.bindposes;
+        }
+
+        var bonesPerVertex = source.GetBonesPerVertex();
+        var boneWeights = source.GetAllBoneWeights();
+        try
+        {
+            if (bonesPerVertex.Length == source.vertexCount && boneWeights.Length > 0)
+            {
+                destination.SetBoneWeights(bonesPerVertex, boneWeights);
+            }
+        }
+        finally
+        {
+            if (boneWeights.IsCreated)
+            {
+                boneWeights.Dispose();
+            }
+
+            if (bonesPerVertex.IsCreated)
+            {
+                bonesPerVertex.Dispose();
+            }
+        }
+
+        destination.subMeshCount = source.subMeshCount;
+        for (var subMeshIndex = 0; subMeshIndex < source.subMeshCount; subMeshIndex++)
+        {
+            destination.SetIndices(source.GetIndices(subMeshIndex), source.GetTopology(subMeshIndex), subMeshIndex, false);
+        }
+
+        if (source.normals.Length == source.vertexCount)
+        {
+            destination.normals = source.normals;
+        }
+        else
+        {
+            destination.RecalculateNormals();
+        }
+
+        destination.bounds = source.bounds;
     }
 }

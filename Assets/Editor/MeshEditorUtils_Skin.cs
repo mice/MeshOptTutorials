@@ -1,34 +1,26 @@
-﻿using MeshOptimizer;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
-using UnityEngine.XR;
 
 public  static partial class MeshEditorUtils
 {
     [MenuItem("Assets/skin/(danger)OptimAndReplace")]
     private static void Editor_ConvSkinMeshReplace()
     {
-        var mesh = Selection.gameObjects.Where(t => (AssetDatabase.LoadAssetAtPath<Mesh>(AssetDatabase.GetAssetPath(t)) != null)).FirstOrDefault();
-        if (mesh != null)
+        if (TryGetSelectedMeshAsset(out var mesh, out var path) &&
+            ValidateSkinnedMeshForProcessing(mesh, path) &&
+            EnsureReplaceSupported(path))
         {
-            OptSkinMeshFileReplace(AssetDatabase.GetAssetPath(mesh));
+            OptSkinMeshFileReplace(mesh, path);
         }
     }
 
     [MenuItem("Assets/skin/convert")]
     private static void Editor_ConvSkinMesh()
     {
-
-        var mesh = Selection.gameObjects.Where(t => (AssetDatabase.LoadAssetAtPath<Mesh>(AssetDatabase.GetAssetPath(t)) != null)).FirstOrDefault();
-        if (mesh != null)
+        if (TryGetSelectedMeshAsset(out var mesh, out var path) &&
+            ValidateSkinnedMeshForProcessing(mesh, path))
         {
-            OptSkinMeshFile(AssetDatabase.GetAssetPath(mesh));
+            OptSkinMeshFile(mesh, path);
         }
     }
 
@@ -36,85 +28,95 @@ public  static partial class MeshEditorUtils
     [MenuItem("Assets/skin/SimplifyMesh")]
     private static void Editor_SimpleSkinMesh()
     {
-        var mesh = Selection.gameObjects.Where(t => (AssetDatabase.LoadAssetAtPath<Mesh>(AssetDatabase.GetAssetPath(t)) != null)).FirstOrDefault();
-        if (mesh != null)
+        if (TryGetSelectedMeshAsset(out var mesh, out var path) &&
+            ValidateSkinnedMeshForProcessing(mesh, path))
         {
-            SimplifySkinMeshFile(AssetDatabase.GetAssetPath(mesh));
+            SimplifySkinMeshFile(mesh, path);
         }
     }
 
-    private static void OptSkinMeshFile(string path)
+    private static void OptSkinMeshFile(Mesh mesh, string path)
     {
-        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-        var fileName = System.IO.Path.GetFileNameWithoutExtension(path);
-
         var simpleMeshEditor = new SkinMeshOpt();
         simpleMeshEditor.Init(mesh);
         var newMesh = simpleMeshEditor.Optimize();
-        AssetDatabase.CreateAsset(newMesh, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_skin_fixed.mesh");
+        AssetDatabase.CreateAsset(newMesh, BuildGeneratedMeshPath(path, "_skin_fixed"));
     }
 
-    private static void OptSkinMeshFileReplace(string path)
+    private static void OptSkinMeshFileReplace(Mesh mesh, string path)
     {
-        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-        var fileName = System.IO.Path.GetFileNameWithoutExtension(path);
-
         var simpleMeshEditor = new SkinMeshOpt();
         simpleMeshEditor.Init(mesh);
         var newMesh = simpleMeshEditor.Optimize();
 
-        mesh.Clear();
-        mesh.SetVertices(newMesh.vertices.ToList());
-        mesh.SetIndices(newMesh.GetIndices(0).Select(t => (int)t).ToArray(), MeshTopology.Triangles, 0);
-        mesh.RecalculateNormals();
+        CopyMesh(mesh, newMesh);
         EditorUtility.SetDirty(mesh);
+        AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        AssetDatabase.CreateAsset(newMesh, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_skin_fixed.mesh");
     }
 
     
 
-    private static void SimplifySkinMeshFile(string path)
+    private static void SimplifySkinMeshFile(Mesh mesh, string path)
     {
-        var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-        var fileName = System.IO.Path.GetFileNameWithoutExtension(path);
-
         var simpleMeshEditor = new SkinMeshOpt();
         simpleMeshEditor.Init(mesh);
 
         var newMesh = simpleMeshEditor.Simplify(75);
-        AssetDatabase.CreateAsset(newMesh, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_075.mesh");
+        AssetDatabase.CreateAsset(newMesh, BuildGeneratedMeshPath(path, "_075"));
 
         var newMesh2 = simpleMeshEditor.Simplify(50);
-        AssetDatabase.CreateAsset(newMesh2, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_050.mesh");
+        AssetDatabase.CreateAsset(newMesh2, BuildGeneratedMeshPath(path, "_050"));
 
         var newMesh3 = simpleMeshEditor.Simplify(25);
-        AssetDatabase.CreateAsset(newMesh3, System.IO.Path.GetDirectoryName(path) + $"\\{fileName}_025.mesh");
+        AssetDatabase.CreateAsset(newMesh3, BuildGeneratedMeshPath(path, "_025"));
     }
-   
 
-    public static List<SimpleSkinData> SkinMeshVertex(Mesh mesh)
+    private static bool ValidateSkinnedMeshForProcessing(Mesh mesh, string assetPath)
     {
-        var vert = mesh.vertices;
-        var uvs = mesh.uv;
-        var bytes = mesh.GetBonesPerVertex();
-        var bone = mesh.boneWeights;
-        UnityEngine.Debug.Assert(vert != null);
-        UnityEngine.Debug.Assert(vert.Length == uvs.Length);
-        UnityEngine.Debug.Assert(vert.Length == bytes.Length);
-        UnityEngine.Debug.Assert(vert.Length == bone.Length);
-
-        var output = new List<SimpleSkinData>();
-        for (int i = 0; i < vert.Length; i++)
+        if (!ValidateMeshForProcessing(mesh, assetPath))
         {
-            output.Add(new SimpleSkinData()
-            {
-                Position = vert[i],
-                UV = uvs[i],
-                VertexByte = bytes[i],
-                Bone = bone[i]
-            });
+            return false;
         }
-        return output;
+
+        if (mesh.bindposes == null || mesh.bindposes.Length == 0)
+        {
+            Debug.LogError($"Skin tools require a skinned mesh with bindposes. '{assetPath}' has no bindposes.");
+            return false;
+        }
+
+        var bonesPerVertex = mesh.GetBonesPerVertex();
+        try
+        {
+            if (bonesPerVertex.Length != mesh.vertexCount)
+            {
+                Debug.LogError($"Skin tools require valid bone weights for every vertex. '{assetPath}' returned {bonesPerVertex.Length} entries for {mesh.vertexCount} vertices.");
+                return false;
+            }
+
+            for (var i = 0; i < bonesPerVertex.Length; i++)
+            {
+                if (bonesPerVertex[i] > 4)
+                {
+                    Debug.LogError($"Skin tools currently support at most 4 bone influences per vertex. '{assetPath}' contains vertices with more than 4 influences.");
+                    return false;
+                }
+            }
+        }
+        finally
+        {
+            if (bonesPerVertex.IsCreated)
+            {
+                bonesPerVertex.Dispose();
+            }
+        }
+
+        if (mesh.boneWeights.Length != mesh.vertexCount)
+        {
+            Debug.LogError($"Skin tools require legacy bone weights for every vertex. '{assetPath}' returned {mesh.boneWeights.Length} legacy weights for {mesh.vertexCount} vertices.");
+            return false;
+        }
+
+        return true;
     }
 }

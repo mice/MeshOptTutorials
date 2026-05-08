@@ -1,6 +1,5 @@
 ﻿using MeshOptimizer;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
@@ -8,9 +7,12 @@ using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 
 
-public struct SimpleSkinData : IEquatable<SimpleSkinData>, IEqualityComparer<SimpleSkinData>
+public struct SimpleSkinData : IEquatable<SimpleSkinData>
 {
     public Vector3 Position;
+    public Vector3 Normal;
+    public Vector4 Tangent;
+    public Color32 Color;
     public Vector2 UV;
     public BoneWeight Bone;
     public int VertexByte;
@@ -18,22 +20,22 @@ public struct SimpleSkinData : IEquatable<SimpleSkinData>, IEqualityComparer<Sim
     public bool Equals(SimpleSkinData other)
     {
         return Position == other.Position
+            && Normal == other.Normal
+            && Tangent == other.Tangent
+            && Color.Equals(other.Color)
             && UV == other.UV
             && Bone == other.Bone
             && VertexByte == other.VertexByte;
     }
 
-    public bool Equals(SimpleSkinData x, SimpleSkinData y)
+    public override bool Equals(object obj)
     {
-        return x.Position == y.Position
-            && x.UV == y.UV
-            && x.Bone == y.Bone
-            && x.VertexByte == y.VertexByte;
+        return obj is SimpleSkinData other && Equals(other);
     }
 
-    public int GetHashCode(SimpleSkinData obj)
+    public override int GetHashCode()
     {
-        return (obj.Position, obj.UV, obj.Bone, obj.VertexByte).GetHashCode();
+        return (Position, Normal, Tangent, Color, UV, Bone, VertexByte).GetHashCode();
     }
 }
 
@@ -41,22 +43,28 @@ public class SkinMeshOpt : IMeshOpt
 {
     public Mesh mesh;
     private uint sizeOfElement;
+    private bool hasNormals;
+    private bool hasTangents;
+    private bool hasColors;
+    private bool hasUv0;
 
     public void Init(Mesh mesh)
     {
         this.mesh = mesh;
         sizeOfElement = (uint)UnsafeUtility.SizeOf<SimpleSkinData>();
+        hasNormals = mesh.normals.Length == mesh.vertexCount;
+        hasTangents = mesh.tangents.Length == mesh.vertexCount;
+        hasColors = mesh.colors32.Length == mesh.vertexCount;
+        hasUv0 = mesh.uv.Length == mesh.vertexCount;
     }
 
     public Mesh Optimize()
     {
         var originVertex = SkinMeshVertex(mesh);
         (var newVertex, var newIndics) = MeshEditorUtils.OptMeshData(mesh, originVertex.ToArray(), (uint)UnsafeUtility.SizeOf<SimpleSkinData>());
-
-
-        List<BoneWeight1> originWeight = mesh.GetAllBoneWeights().ToList();
+        var originWeight = GetBoneWeights(mesh);
         var newBoneWeights = MakeBoneWeight(originVertex, newVertex, originWeight);
-        var newMesh = ToMesh(this.mesh, newVertex, newIndics, newBoneWeights);
+        var newMesh = ToMesh(newVertex, newIndics, newBoneWeights);
         return newMesh;
     }
 
@@ -66,30 +74,63 @@ public class SkinMeshOpt : IMeshOpt
         (var newVertex, var newIndics) = MeshEditorUtils.OptMeshData(mesh, originVertex.ToArray(), (uint)UnsafeUtility.SizeOf<SimpleSkinData>());
 
         var newSimpleIndics = MeshOperations.Simplify(newIndics, newVertex, sizeOfElement, (uint)(newIndics.Length * percent / 100.0f), 0.01f, 0, out var error);
-        List<BoneWeight1> originWeight = mesh.GetAllBoneWeights().ToList();
+        var originWeight = GetBoneWeights(mesh);
         var newBoneWeights = MakeBoneWeight(originVertex, newVertex, originWeight);
 
-        var newMesh = ToMesh(this.mesh, newVertex, newSimpleIndics, newBoneWeights);
+        var newMesh = ToMesh(newVertex, newSimpleIndics, newBoneWeights);
         return newMesh;
     }
 
-    private static Mesh ToMesh(Mesh originMesh,SimpleSkinData[] newVertex, uint[] newIndics,List<BoneWeight1> newBoneWeights)
+    public Mesh MergeLOD()
     {
-        var newMesh = new Mesh();
+        throw new NotSupportedException("LOD merge is only implemented for static meshes.");
+    }
+
+
+    private Mesh ToMesh(SimpleSkinData[] newVertex, uint[] newIndics, List<BoneWeight1> newBoneWeights)
+    {
+        var newMesh = new Mesh
+        {
+            name = mesh.name,
+            indexFormat = mesh.indexFormat
+        };
         newMesh.SetVertices(newVertex.Select(t => t.Position).ToArray());
-        newMesh.SetUVs(0, newVertex.Select(t => t.UV).ToArray());
+        if (hasNormals)
+        {
+            newMesh.SetNormals(newVertex.Select(t => t.Normal).ToList());
+        }
+
+        if (hasTangents)
+        {
+            newMesh.SetTangents(newVertex.Select(t => t.Tangent).ToList());
+        }
+
+        if (hasColors)
+        {
+            newMesh.SetColors(newVertex.Select(t => t.Color).ToList());
+        }
+
+        if (hasUv0)
+        {
+            newMesh.SetUVs(0, newVertex.Select(t => t.UV).ToArray());
+        }
+
         var tmpVet = new NativeArray<byte>(newVertex.Length, Allocator.Temp);
         tmpVet.CopyFrom(newVertex.Select(t => (byte)t.VertexByte).ToArray());
 
         var tmpVet2 = new NativeArray<BoneWeight1>(newBoneWeights.Count, Allocator.Temp);
         tmpVet2.CopyFrom(newBoneWeights.ToArray());
         newMesh.SetBoneWeights(tmpVet, tmpVet2);
-        newMesh.boneWeights = newVertex.Select(t => t.Bone).ToArray();
 
-        newMesh.bindposes = originMesh.bindposes;
+        newMesh.bindposes = mesh.bindposes;
         newMesh.SetIndices(newIndics.Select(t => (int)t).ToArray(), MeshTopology.Triangles, 0);
-        newMesh.RecalculateNormals();
+        if (!hasNormals)
+        {
+            newMesh.RecalculateNormals();
+        }
+        newMesh.bounds = mesh.bounds;
         tmpVet.Dispose();
+        tmpVet2.Dispose();
         return newMesh;
     }
 
@@ -133,28 +174,60 @@ public class SkinMeshOpt : IMeshOpt
         return newBoneWeights;
     }
 
+    private static List<BoneWeight1> GetBoneWeights(Mesh mesh)
+    {
+        var boneWeights = mesh.GetAllBoneWeights();
+        try
+        {
+            return boneWeights.ToList();
+        }
+        finally
+        {
+            if (boneWeights.IsCreated)
+            {
+                boneWeights.Dispose();
+            }
+        }
+    }
+
     public static List<SimpleSkinData> SkinMeshVertex(Mesh mesh)
     {
         var vert = mesh.vertices;
+        var normals = mesh.normals;
+        var tangents = mesh.tangents;
+        var colors = mesh.colors32;
         var uvs = mesh.uv;
         var bytes = mesh.GetBonesPerVertex();
         var bone = mesh.boneWeights;
-        UnityEngine.Debug.Assert(vert != null);
-        UnityEngine.Debug.Assert(vert.Length == uvs.Length);
-        UnityEngine.Debug.Assert(vert.Length == bytes.Length);
-        UnityEngine.Debug.Assert(vert.Length == bone.Length);
-
-        var output = new List<SimpleSkinData>();
-        for (int i = 0; i < vert.Length; i++)
+        try
         {
-            output.Add(new SimpleSkinData()
+            UnityEngine.Debug.Assert(vert != null);
+            UnityEngine.Debug.Assert(vert.Length == bytes.Length);
+            UnityEngine.Debug.Assert(vert.Length == bone.Length);
+
+            var output = new List<SimpleSkinData>(vert.Length);
+            for (int i = 0; i < vert.Length; i++)
             {
-                Position = vert[i],
-                UV = uvs[i],
-                VertexByte = bytes[i],
-                Bone = bone[i]
-            });
+                output.Add(new SimpleSkinData()
+                {
+                    Position = vert[i],
+                    Normal = normals.Length == vert.Length ? normals[i] : default,
+                    Tangent = tangents.Length == vert.Length ? tangents[i] : default,
+                    Color = colors.Length == vert.Length ? colors[i] : new Color32(255, 255, 255, 255),
+                    UV = uvs.Length == vert.Length ? uvs[i] : default,
+                    VertexByte = bytes[i],
+                    Bone = bone[i]
+                });
+            }
+
+            return output;
         }
-        return output;
+        finally
+        {
+            if (bytes.IsCreated)
+            {
+                bytes.Dispose();
+            }
+        }
     }
 }
