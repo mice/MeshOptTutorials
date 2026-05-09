@@ -1,0 +1,18 @@
+{
+    "entries": [
+        {
+            "entryId": "Assets/res/raw/chars/Anim_1325/Export/Anim_1325.FBX",
+            "isExternalSource": true,
+            "externalSourcePath": "chars/Anim_1325/Export/Anim_1325.FBX",
+            "outputPath": "Assets/res/raw/chars/Anim_1325/Export/Anim_1325_trim.fbx",
+            "reductionPercent": 50
+        },
+        {
+            "entryId": "Assets/res/raw/chars/Anim_1326/Export/Anim_1326.FBX",
+            "isExternalSource": false,
+            "externalSourcePath": "",
+            "outputPath": "Assets/res/raw/chars/Anim_1326/Export/Anim_1326_trim.fbx",
+            "reductionPercent": 90
+        }
+    ]
+}

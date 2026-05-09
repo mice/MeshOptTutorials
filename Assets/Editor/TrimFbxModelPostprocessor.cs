@@ -12,6 +12,7 @@ public sealed class TrimFbxModelPostprocessor : AssetPostprocessor
 
         if (assetImporter is ModelImporter modelImporter)
         {
+            modelImporter.isReadable = false;
             modelImporter.importNormals = ModelImporterNormals.Import;
             modelImporter.importTangents = ModelImporterTangents.CalculateMikk;
         }

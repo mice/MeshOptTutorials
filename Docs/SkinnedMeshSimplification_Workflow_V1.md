@@ -21,7 +21,7 @@ Responsibilities:
 - let the user configure simplification parameters
 - let the user compare the original and simplified result
 - let the user review the core evaluation data for the current result
-- for the first visual pass, config save may remain manual
+- the current minimal window can save `reductionPercent` and `outputPath` back to config
 - full V1 execution readiness still expects the selected parameter set to be writable for CLI execution
 
 V1 parameter scope:
@@ -39,7 +39,15 @@ Phase-1 visual scope:
 - update the simplified model after `reductionPercent` changes
 - update the displayed core evaluation data after the simplified model changes
 - for the first visual pass, the displayed core evaluation data may be limited to currently available non-benchmark indicators such as reduction ratio, vertex or triangle counts, output import status, and any available validation flags
-- use manually prepared config entries for early test cases
+- manually prepared config entries are still allowed for early test cases, but the current window can now write the active entry back to the canonical config
+
+Current visual implementation:
+
+- the current window presents the core mesh counts in a comparison layout with `Original`, `Simplified`, and `Delta` columns
+- `outputPath` is still editable as routing data, but no extra simplification parameter is exposed
+- the current window also shows import-status and validation flags for the source mesh, the preview mesh, and the current output asset
+- the preview path now guards against zero-sized editor layout rects before trying to create preview render textures
+- Unity-side interactive validation has confirmed that the current minimal visual workflow behaves as expected for the canonical sample flow
 
 Not in scope for V1:
 
@@ -95,6 +103,14 @@ For V1, the CLI contract should be kept minimal and stable:
 - the target entry is selected by `entryId`
 - `outputPath` comes from config unless an explicit override mode is added later
 - the same entry must resolve to the same staging and derived output behavior as the visual path
+
+Current code entry:
+
+- Unity execute method: `MeshEditorUtils.Batch_SimplifySkinMeshToFbx`
+- required argument: `-entryId <value>`
+- optional argument: `-configPath <path>`
+- the canonical `Anim_1325` config entry now completes batch export end-to-end without editor interaction
+- automated wrapper: `Tools/Validate-SkinnedMeshBatchExport.ps1`
 
 ## Shared Parameter Contract
 
