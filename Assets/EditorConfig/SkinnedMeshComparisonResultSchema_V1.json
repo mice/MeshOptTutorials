@@ -1,0 +1,461 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "SkinnedMeshComparisonResultSchema_V1.json",
+    "title": "Skinned Mesh Comparison Result V1",
+    "description": "Machine-readable contract for future skinned-mesh comparison outputs. It bridges the current gate-oriented suite reports with later deformation metrics and visualization artifacts.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schemaVersion",
+        "comparisonSetId",
+        "benchmarkSetId",
+        "generatedAtUtc",
+        "generator",
+        "normalization",
+        "aggregate",
+        "entries"
+    ],
+    "properties": {
+        "schemaVersion": {
+            "type": "string",
+            "const": "v1"
+        },
+        "comparisonSetId": {
+            "type": "string",
+            "minLength": 1
+        },
+        "benchmarkSetId": {
+            "type": "string",
+            "minLength": 1
+        },
+        "generatedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "generator": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "tool",
+                "unityVersion"
+            ],
+            "properties": {
+                "tool": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "toolVersion": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "unityVersion": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "suiteSummaryPath": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            }
+        },
+        "normalization": {
+            "type": "string",
+            "enum": [
+                "mesh_bounds_diagonal",
+                "character_height",
+                "unnormalized"
+            ]
+        },
+        "aggregate": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "totalEntries",
+                "computedEntries",
+                "gateCoverage",
+                "metricCoverage"
+            ],
+            "properties": {
+                "totalEntries": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "computedEntries": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "gateCoverage": {
+                    "$ref": "#/$defs/gateCoverage"
+                },
+                "metricCoverage": {
+                    "$ref": "#/$defs/metricCoverage"
+                }
+            }
+        },
+        "entries": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/entry"
+            }
+        }
+    },
+    "$defs": {
+        "gateCoverage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "successLogFound",
+                "importValidationLogFound",
+                "restPoseValidationLogFound",
+                "neutralPoseValidationLogFound",
+                "highDeformationPoseValidationLogFound",
+                "outputReadWriteDisabled",
+                "stagingEmpty",
+                "outputUpdated"
+            ],
+            "properties": {
+                "successLogFound": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "importValidationLogFound": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "restPoseValidationLogFound": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "neutralPoseValidationLogFound": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "highDeformationPoseValidationLogFound": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "outputReadWriteDisabled": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "stagingEmpty": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "outputUpdated": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "metricCoverage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "jointRegionP95Error",
+                "globalP95Error",
+                "maxError",
+                "screenSpaceDiff"
+            ],
+            "properties": {
+                "jointRegionP95Error": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "globalP95Error": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "maxError": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "screenSpaceDiff": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "entry": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "entryId",
+                "reductionPercent",
+                "sourceProfile",
+                "outputAssetPath",
+                "gate",
+                "representativePoses",
+                "comparison"
+            ],
+            "properties": {
+                "entryId": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "reductionPercent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                },
+                "sourceProfile": {
+                    "type": "string",
+                    "enum": [
+                        "external_staged",
+                        "project_asset",
+                        "unknown"
+                    ]
+                },
+                "externalSourcePath": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "outputAssetPath": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "suiteEntryReportPath": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "gate": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "successLogFound",
+                        "importValidationLogFound",
+                        "restPoseValidationLogFound",
+                        "neutralPoseValidationLogFound",
+                        "highDeformationPoseValidationLogFound",
+                        "outputReadWriteDisabled",
+                        "stagingEmpty",
+                        "outputUpdated",
+                        "failureReasons"
+                    ],
+                    "properties": {
+                        "successLogFound": {
+                            "type": "boolean"
+                        },
+                        "importValidationLogFound": {
+                            "type": "boolean"
+                        },
+                        "restPoseValidationLogFound": {
+                            "type": "boolean"
+                        },
+                        "neutralPoseValidationLogFound": {
+                            "type": "boolean"
+                        },
+                        "highDeformationPoseValidationLogFound": {
+                            "type": "boolean"
+                        },
+                        "outputReadWriteDisabled": {
+                            "type": "boolean"
+                        },
+                        "stagingEmpty": {
+                            "type": "boolean"
+                        },
+                        "outputUpdated": {
+                            "type": "boolean"
+                        },
+                        "failureReasons": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "representativePoses": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "rest",
+                        "neutral",
+                        "highDeformation"
+                    ],
+                    "properties": {
+                        "rest": {
+                            "$ref": "#/$defs/poseResult"
+                        },
+                        "neutral": {
+                            "$ref": "#/$defs/poseResult"
+                        },
+                        "highDeformation": {
+                            "$ref": "#/$defs/poseResult"
+                        }
+                    }
+                },
+                "comparison": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "status",
+                        "normalizationBasis",
+                        "metrics",
+                        "worstFrames",
+                        "artifacts"
+                    ],
+                    "properties": {
+                        "status": {
+                            "type": "string",
+                            "enum": [
+                                "not_computed",
+                                "partial",
+                                "computed"
+                            ]
+                        },
+                        "normalizationBasis": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        },
+                        "metrics": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                                "jointRegionP95Error",
+                                "globalP95Error",
+                                "maxError",
+                                "screenSpaceDiff"
+                            ],
+                            "properties": {
+                                "jointRegionP95Error": {
+                                    "type": [
+                                        "number",
+                                        "null"
+                                    ]
+                                },
+                                "globalP95Error": {
+                                    "type": [
+                                        "number",
+                                        "null"
+                                    ]
+                                },
+                                "maxError": {
+                                    "type": [
+                                        "number",
+                                        "null"
+                                    ]
+                                },
+                                "screenSpaceDiff": {
+                                    "type": [
+                                        "number",
+                                        "null"
+                                    ]
+                                }
+                            }
+                        },
+                        "worstFrames": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                                "jointRegion",
+                                "global"
+                            ],
+                            "properties": {
+                                "jointRegion": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                    }
+                                },
+                                "global": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                    }
+                                }
+                            }
+                        },
+                        "artifacts": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                                "sideBySideRenderPath",
+                                "errorHeatmapPath",
+                                "perFrameCurvePath",
+                                "worstFrameManifestPath"
+                            ],
+                            "properties": {
+                                "sideBySideRenderPath": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "errorHeatmapPath": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "perFrameCurvePath": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "worstFrameManifestPath": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "poseResult": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "status",
+                "clipAssetPath",
+                "clipName",
+                "details"
+            ],
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "pass",
+                        "fail",
+                        "skipped",
+                        "not_computed"
+                    ]
+                },
+                "clipAssetPath": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "clipName": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "details": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            }
+        }
+    }
+}

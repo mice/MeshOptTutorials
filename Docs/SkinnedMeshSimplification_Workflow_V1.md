@@ -39,6 +39,7 @@ Phase-1 visual scope:
 - update the simplified model after `reductionPercent` changes
 - update the displayed core evaluation data after the simplified model changes
 - for the first visual pass, the displayed core evaluation data may be limited to currently available non-benchmark indicators such as reduction ratio, vertex or triangle counts, output import status, and any available validation flags
+- the current window may also surface cached summaries from the existing partial comparison-metric producer for the current output asset, but it does not attempt to run the full benchmark evidence pipeline on every UI refresh
 - manually prepared config entries are still allowed for early test cases, but the current window can now write the active entry back to the canonical config
 
 Current visual implementation:
@@ -46,6 +47,8 @@ Current visual implementation:
 - the current window presents the core mesh counts in a comparison layout with `Original`, `Simplified`, and `Delta` columns
 - `outputPath` is still editable as routing data, but no extra simplification parameter is exposed
 - the current window also shows import-status and validation flags for the source mesh, the preview mesh, and the current output asset
+- the current window now also shows cached rest-pose, neutral-pose, and high-deformation validation signals for the current output asset, aligned with the authoritative batch checks
+- the current window now also shows cached `jointRegionP95Error`, `globalP95Error`, `maxError`, and `screenSpaceDiff` summaries for the current output asset, along with worst-pose labels and representative-pose coverage from the current partial comparison result
 - the preview path now guards against zero-sized editor layout rects before trying to create preview render textures
 - Unity-side interactive validation has confirmed that the current minimal visual workflow behaves as expected for the canonical sample flow
 

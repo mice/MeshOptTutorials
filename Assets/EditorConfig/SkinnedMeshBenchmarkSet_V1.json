@@ -1,0 +1,57 @@
+{
+    "benchmarkSetId": "skinned-mesh-benchmark-seed-v1",
+    "description": "Seed benchmark set aligned with the currently validated skinned-mesh simplification suite. This is the first machine-readable benchmark definition, not the final corpus.",
+    "normalization": "mesh_bounds_diagonal",
+    "requiredPoseCategories": [
+        {
+            "category": "rest",
+            "selection": "baked_rest_pose"
+        },
+        {
+            "category": "neutral",
+            "selection": "prefer_idle_then_run"
+        },
+        {
+            "category": "highDeformation",
+            "selection": "prefer_attack_then_hurt_then_death"
+        }
+    ],
+    "entries": [
+        {
+            "entryId": "Assets/res/raw/chars/Anim_1325/Export/Anim_1325.FBX",
+            "sourceProfile": "external_staged",
+            "benchmarkReductionPercents": [
+                50
+            ],
+            "requiredClipAssets": {
+                "neutral": [
+                    "Assets/res/raw/chars/Anim_1325/Export/Anim_1325@Idle.FBX",
+                    "Assets/res/raw/chars/Anim_1325/Export/Anim_1325@Run.FBX"
+                ],
+                "highDeformation": [
+                    "Assets/res/raw/chars/Anim_1325/Export/Anim_1325@Attack.FBX",
+                    "Assets/res/raw/chars/Anim_1325/Export/Anim_1325@Hurt.FBX",
+                    "Assets/res/raw/chars/Anim_1325/Export/Anim_1325@Death.FBX"
+                ]
+            }
+        },
+        {
+            "entryId": "Assets/res/raw/chars/Anim_1326/Export/Anim_1326.FBX",
+            "sourceProfile": "project_asset",
+            "benchmarkReductionPercents": [
+                90
+            ],
+            "requiredClipAssets": {
+                "neutral": [
+                    "Assets/res/raw/chars/Anim_1326/Export/Anim_1326@Idle.FBX",
+                    "Assets/res/raw/chars/Anim_1326/Export/Anim_1326@Run.FBX"
+                ],
+                "highDeformation": [
+                    "Assets/res/raw/chars/Anim_1326/Export/Anim_1326@Attack.FBX",
+                    "Assets/res/raw/chars/Anim_1326/Export/Anim_1326@Hurt.FBX",
+                    "Assets/res/raw/chars/Anim_1326/Export/Anim_1326@Death.FBX"
+                ]
+            }
+        }
+    ]
+}
