@@ -4,8 +4,10 @@ Select the target mesh asset in the Project window, then use the context menu:
 
 - `Assets/mesh/convert`
 - `Assets/mesh/SimplifyMesh`
+- `Assets/mesh/MergeSimplifiedMesh`
 - `Assets/skin/convert`
 - `Assets/skin/SimplifyMesh`
+- `Assets/skin/MergeSimplifiedMesh`
 
 ## Supported Scope And Hard Constraints
 
@@ -31,9 +33,9 @@ It is **not** a general-purpose mesh simplifier. Use it only when all constraint
 - This is enforced by `ValidateSkinnedMeshForProcessing(...)`
 - Reason: the current implementation depends on the legacy `BoneWeight` path and assumes `bonesPerVertex <= 4`
 
-#### C3 - Single-submesh meshes only
+#### C3 - Single-submesh input meshes only
 
-- Only **single-submesh** meshes are supported
+- Only **single-submesh source meshes** are supported
 - Reason: the current tool processes one triangle index buffer and does not preserve multi-submesh authoring structure
 
 #### C4 - Valid skinning data is required
@@ -58,7 +60,9 @@ It is **not** a general-purpose mesh simplifier. Use it only when all constraint
 
 ### Practical interpretation
 
-If a mesh is a normal character / monster mesh, has no BlendShape, uses one submesh, uses at most 4 bone influences per vertex, and only relies on UV0, then the tool is within its intended operating range.
+If a mesh is a normal character / monster mesh, has no BlendShape, uses one source submesh, uses at most 4 bone influences per vertex, and only relies on UV0, then the tool is within its intended operating range.
+
+The merged simplify menu outputs one generated mesh asset with 3 triangle submeshes for the fixed 80% / 45% / 20% reduction levels. That output shape does not relax the single-submesh requirement for the source asset.
 
 As an editor tool, mesh readability itself is not treated here as a product-level limitation, because it can be adjusted on the asset import side when needed.
 

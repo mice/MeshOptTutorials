@@ -1,4 +1,4 @@
-﻿using MeshOptimizer;
+using MeshOptimizer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -67,6 +67,14 @@ public class SimpleMeshOpt : IMeshOpt
         return ToMesh(newVertex, newSimpleIndics);
     }
 
+    public Mesh MergeSimplified(params int[] percents)
+    {
+        var normalizedPercents = NormalizeSimplifyPercents(percents);
+        var originVertex = MeshVertexData(mesh);
+        (var newVertex, var newIndics) = MeshEditorUtils.OptMeshData(mesh, originVertex.ToArray(), sizeOfElement);
+        var mergedIndices = BuildSimplifiedIndexBuffers(newVertex, newIndics, normalizedPercents);
+        return ToMesh(newVertex, mergedIndices);
+    }
 
     public Mesh MergeLOD()
     {
@@ -86,8 +94,29 @@ public class SimpleMeshOpt : IMeshOpt
         };
         ApplyVertexData(newMesh, vertices);
         newMesh.subMeshCount = 2;
-        newMesh.SetIndices(originIndics.Select(t => (int)t).ToArray(), MeshTopology.Triangles,0);
+        newMesh.SetIndices(originIndics.Select(t => (int)t).ToArray(), MeshTopology.Triangles, 0);
         newMesh.SetIndices(newSimpleIndics.Select(t => (int)t).ToArray(), MeshTopology.Triangles, 1);
+        if (!hasNormals)
+        {
+            newMesh.RecalculateNormals();
+        }
+        newMesh.bounds = mesh.bounds;
+        return newMesh;
+    }
+
+    private Mesh ToMesh(IReadOnlyList<SimpleMeshData> vertices, IReadOnlyList<uint[]> subMeshIndices)
+    {
+        var newMesh = new Mesh
+        {
+            name = mesh.name,
+            indexFormat = mesh.indexFormat
+        };
+        ApplyVertexData(newMesh, vertices);
+        newMesh.subMeshCount = subMeshIndices.Count;
+        for (var subMeshIndex = 0; subMeshIndex < subMeshIndices.Count; subMeshIndex++)
+        {
+            newMesh.SetIndices(subMeshIndices[subMeshIndex].Select(t => (int)t).ToArray(), MeshTopology.Triangles, subMeshIndex);
+        }
         if (!hasNormals)
         {
             newMesh.RecalculateNormals();
@@ -159,5 +188,39 @@ public class SimpleMeshOpt : IMeshOpt
         }
 
         return output;
+    }
+
+    private uint[][] BuildSimplifiedIndexBuffers(SimpleMeshData[] vertices, uint[] sourceIndices, IReadOnlyList<int> percents)
+    {
+        var mergedIndices = new uint[percents.Count][];
+        for (var index = 0; index < percents.Count; index++)
+        {
+            var percent = percents[index];
+            mergedIndices[index] = MeshOperations.Simplify(sourceIndices, vertices, sizeOfElement, (uint)(sourceIndices.Length * percent / 100.0f), 0.01f, 0, out var error);
+        }
+
+        return mergedIndices;
+    }
+
+    private static int[] NormalizeSimplifyPercents(int[] percents)
+    {
+        if (percents == null || percents.Length == 0)
+        {
+            throw new ArgumentException("At least one simplify percent must be provided.", nameof(percents));
+        }
+
+        var normalizedPercents = new int[percents.Length];
+        for (var index = 0; index < percents.Length; index++)
+        {
+            var percent = percents[index];
+            if (percent <= 0 || percent > 100)
+            {
+                throw new ArgumentOutOfRangeException(nameof(percents), $"Simplify percent must be between 1 and 100. Received {percent}.");
+            }
+
+            normalizedPercents[index] = percent;
+        }
+
+        return normalizedPercents;
     }
 }

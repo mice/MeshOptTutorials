@@ -1,4 +1,4 @@
-﻿using MeshOptimizer;
+using MeshOptimizer;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,12 +11,15 @@ public interface IMeshOpt
     void Init(Mesh mesh);
     Mesh Simplify(int percent);
     Mesh Optimize();
+    Mesh MergeSimplified(params int[] percents);
 
     Mesh MergeLOD();
 }
 
 public static partial class MeshEditorUtils
 {
+    private static readonly int[] DefaultMergedSimplifyPercents = { 80, 45, 20 };
+
     [MenuItem("Assets/mesh/(danger)OptimAndReplace")]
     private static void Editor_ConvMeshReplace()
     {
@@ -58,6 +61,16 @@ public static partial class MeshEditorUtils
         }
     }
 
+    [MenuItem("Assets/mesh/MergeSimplifiedMesh")]
+    private static void Editor_MergeSimplifiedMesh()
+    {
+        if (TryGetSelectedMeshAsset(out var mesh, out var path) &&
+            ValidateMeshForProcessing(mesh, path))
+        {
+            MergeSimplifiedMeshFile(mesh, path);
+        }
+    }
+
     private static void ShadowMeshFile(Mesh mesh, string path)
     {
         var simpleMeshEditor = new SimpleMeshOpt();
@@ -67,6 +80,14 @@ public static partial class MeshEditorUtils
         AssetDatabase.CreateAsset(newMesh, BuildGeneratedMeshPath(path, "_lod"));
     }
 
+    private static void MergeSimplifiedMeshFile(Mesh mesh, string path)
+    {
+        var simpleMeshEditor = new SimpleMeshOpt();
+        simpleMeshEditor.Init(mesh);
+
+        var newMesh = simpleMeshEditor.MergeSimplified(DefaultMergedSimplifyPercents);
+        AssetDatabase.CreateAsset(newMesh, BuildGeneratedMeshPath(path, "_lod_804520"));
+    }
 
     private static void SimplifyMeshFile(Mesh mesh, string path)
     {
@@ -82,8 +103,6 @@ public static partial class MeshEditorUtils
         var newMesh3 = simpleMeshEditor.Simplify(25);
         AssetDatabase.CreateAsset(newMesh3, BuildGeneratedMeshPath(path, "_025"));
     }
-
-
 
     private static void OptMeshFile(Mesh mesh, string path)
     {
@@ -104,14 +123,11 @@ public static partial class MeshEditorUtils
         AssetDatabase.Refresh();
     }
 
-
-    public static (T[] vertex, uint[] indices) OptMeshData<T>(Mesh mesh, T[] originList ,uint sizeOfT) where T : struct
+    public static (T[] vertex, uint[] indices) OptMeshData<T>(Mesh mesh, T[] originList, uint sizeOfT) where T : struct
     {
         var vertices = new List<T>(originList);
         var indics = mesh.GetIndices(0).Select(t => (uint)t).ToArray();
 
-        //remapVertexBuff
-        //remapIndicsBuff
         (var newVertex, var newIndics) = MeshOperations.Reindex(vertices.ToArray(), indics, sizeOfT);
 
         MeshOperations.OptimizeCache(newIndics, newVertex.Length);

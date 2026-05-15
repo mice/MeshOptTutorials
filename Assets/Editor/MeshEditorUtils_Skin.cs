@@ -1,7 +1,7 @@
-﻿using UnityEditor;
+using UnityEditor;
 using UnityEngine;
 
-public  static partial class MeshEditorUtils
+public static partial class MeshEditorUtils
 {
     [MenuItem("Assets/skin/(danger)OptimAndReplace")]
     private static void Editor_ConvSkinMeshReplace()
@@ -24,7 +24,6 @@ public  static partial class MeshEditorUtils
         }
     }
 
-
     [MenuItem("Assets/skin/SimplifyMesh")]
     private static void Editor_SimpleSkinMesh()
     {
@@ -32,6 +31,16 @@ public  static partial class MeshEditorUtils
             ValidateSkinnedMeshForProcessing(mesh, path))
         {
             SimplifySkinMeshFile(mesh, path);
+        }
+    }
+
+    [MenuItem("Assets/skin/MergeSimplifiedMesh")]
+    private static void Editor_MergeSimplifiedSkinMesh()
+    {
+        if (TryGetSelectedMeshAsset(out var mesh, out var path) &&
+            ValidateSkinnedMeshForProcessing(mesh, path))
+        {
+            MergeSimplifiedSkinMeshFile(mesh, path);
         }
     }
 
@@ -55,8 +64,6 @@ public  static partial class MeshEditorUtils
         AssetDatabase.Refresh();
     }
 
-    
-
     private static void SimplifySkinMeshFile(Mesh mesh, string path)
     {
         var simpleMeshEditor = new SkinMeshOpt();
@@ -70,6 +77,15 @@ public  static partial class MeshEditorUtils
 
         var newMesh3 = simpleMeshEditor.Simplify(25);
         AssetDatabase.CreateAsset(newMesh3, BuildGeneratedMeshPath(path, "_025"));
+    }
+
+    private static void MergeSimplifiedSkinMeshFile(Mesh mesh, string path)
+    {
+        var simpleMeshEditor = new SkinMeshOpt();
+        simpleMeshEditor.Init(mesh);
+
+        var newMesh = simpleMeshEditor.MergeSimplified(DefaultMergedSimplifyPercents);
+        AssetDatabase.CreateAsset(newMesh, BuildGeneratedMeshPath(path, "_skin_lod_804520"));
     }
 
     private static bool ValidateSkinnedMeshForProcessing(Mesh mesh, string assetPath)

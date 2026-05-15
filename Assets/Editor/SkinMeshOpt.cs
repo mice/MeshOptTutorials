@@ -1,11 +1,10 @@
-﻿using MeshOptimizer;
+using MeshOptimizer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
-
 
 public struct SimpleSkinData : IEquatable<SimpleSkinData>
 {
@@ -81,11 +80,23 @@ public class SkinMeshOpt : IMeshOpt
         return newMesh;
     }
 
+    public Mesh MergeSimplified(params int[] percents)
+    {
+        var normalizedPercents = NormalizeSimplifyPercents(percents);
+        var originVertex = SkinMeshVertex(mesh);
+        (var newVertex, var newIndics) = MeshEditorUtils.OptMeshData(mesh, originVertex.ToArray(), (uint)UnsafeUtility.SizeOf<SimpleSkinData>());
+
+        var originWeight = GetBoneWeights(mesh);
+        var newBoneWeights = MakeBoneWeight(originVertex, newVertex, originWeight);
+        var mergedIndices = BuildSimplifiedIndexBuffers(newVertex, newIndics, normalizedPercents);
+
+        return ToMesh(newVertex, mergedIndices, newBoneWeights);
+    }
+
     public Mesh MergeLOD()
     {
         throw new NotSupportedException("LOD merge is only implemented for static meshes.");
     }
-
 
     private Mesh ToMesh(SimpleSkinData[] newVertex, uint[] newIndics, List<BoneWeight1> newBoneWeights)
     {
@@ -124,6 +135,57 @@ public class SkinMeshOpt : IMeshOpt
 
         newMesh.bindposes = mesh.bindposes;
         newMesh.SetIndices(newIndics.Select(t => (int)t).ToArray(), MeshTopology.Triangles, 0);
+        if (!hasNormals)
+        {
+            newMesh.RecalculateNormals();
+        }
+        newMesh.bounds = mesh.bounds;
+        tmpVet.Dispose();
+        tmpVet2.Dispose();
+        return newMesh;
+    }
+
+    private Mesh ToMesh(SimpleSkinData[] newVertex, IReadOnlyList<uint[]> subMeshIndices, List<BoneWeight1> newBoneWeights)
+    {
+        var newMesh = new Mesh
+        {
+            name = mesh.name,
+            indexFormat = mesh.indexFormat
+        };
+        newMesh.SetVertices(newVertex.Select(t => t.Position).ToArray());
+        if (hasNormals)
+        {
+            newMesh.SetNormals(newVertex.Select(t => t.Normal).ToList());
+        }
+
+        if (hasTangents)
+        {
+            newMesh.SetTangents(newVertex.Select(t => t.Tangent).ToList());
+        }
+
+        if (hasColors)
+        {
+            newMesh.SetColors(newVertex.Select(t => t.Color).ToList());
+        }
+
+        if (hasUv0)
+        {
+            newMesh.SetUVs(0, newVertex.Select(t => t.UV).ToArray());
+        }
+
+        var tmpVet = new NativeArray<byte>(newVertex.Length, Allocator.Temp);
+        tmpVet.CopyFrom(newVertex.Select(t => (byte)t.VertexByte).ToArray());
+
+        var tmpVet2 = new NativeArray<BoneWeight1>(newBoneWeights.Count, Allocator.Temp);
+        tmpVet2.CopyFrom(newBoneWeights.ToArray());
+        newMesh.SetBoneWeights(tmpVet, tmpVet2);
+
+        newMesh.bindposes = mesh.bindposes;
+        newMesh.subMeshCount = subMeshIndices.Count;
+        for (var subMeshIndex = 0; subMeshIndex < subMeshIndices.Count; subMeshIndex++)
+        {
+            newMesh.SetIndices(subMeshIndices[subMeshIndex].Select(t => (int)t).ToArray(), MeshTopology.Triangles, subMeshIndex);
+        }
         if (!hasNormals)
         {
             newMesh.RecalculateNormals();
@@ -229,5 +291,39 @@ public class SkinMeshOpt : IMeshOpt
                 bytes.Dispose();
             }
         }
+    }
+
+    private uint[][] BuildSimplifiedIndexBuffers(SimpleSkinData[] vertices, uint[] sourceIndices, IReadOnlyList<int> percents)
+    {
+        var mergedIndices = new uint[percents.Count][];
+        for (var index = 0; index < percents.Count; index++)
+        {
+            var percent = percents[index];
+            mergedIndices[index] = MeshOperations.Simplify(sourceIndices, vertices, sizeOfElement, (uint)(sourceIndices.Length * percent / 100.0f), 0.01f, 0, out var error);
+        }
+
+        return mergedIndices;
+    }
+
+    private static int[] NormalizeSimplifyPercents(int[] percents)
+    {
+        if (percents == null || percents.Length == 0)
+        {
+            throw new ArgumentException("At least one simplify percent must be provided.", nameof(percents));
+        }
+
+        var normalizedPercents = new int[percents.Length];
+        for (var index = 0; index < percents.Length; index++)
+        {
+            var percent = percents[index];
+            if (percent <= 0 || percent > 100)
+            {
+                throw new ArgumentOutOfRangeException(nameof(percents), $"Simplify percent must be between 1 and 100. Received {percent}.");
+            }
+
+            normalizedPercents[index] = percent;
+        }
+
+        return normalizedPercents;
     }
 }
