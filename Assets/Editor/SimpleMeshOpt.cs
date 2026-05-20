@@ -59,20 +59,20 @@ public class SimpleMeshOpt : IMeshOpt
         return ToMesh(newVertex, newIndics);
     }
 
-    public Mesh Simplify(int percent)
+    public Mesh Simplify(int percent, float target_error = 0.01f)
     {
         var originVertex = MeshVertexData(mesh);
         (var newVertex, var newIndics) = MeshEditorUtils.OptMeshData(mesh, originVertex.ToArray(), sizeOfElement);
-        var newSimpleIndics = MeshOperations.Simplify(newIndics, newVertex, sizeOfElement, (uint)(newIndics.Length * percent / 100.0f), 0.01f, 0, out var error);
+        var newSimpleIndics = MeshOperations.Simplify(newIndics, newVertex, sizeOfElement, (uint)(newIndics.Length * percent / 100.0f), target_error, 0, out var error);
         return ToMesh(newVertex, newSimpleIndics);
     }
 
-    public Mesh MergeSimplified(params int[] percents)
+    public Mesh MergeSimplified(int[] percents, float[] target_errors)
     {
         var normalizedPercents = NormalizeSimplifyPercents(percents);
         var originVertex = MeshVertexData(mesh);
         (var newVertex, var newIndics) = MeshEditorUtils.OptMeshData(mesh, originVertex.ToArray(), sizeOfElement);
-        var mergedIndices = BuildSimplifiedIndexBuffers(newVertex, newIndics, normalizedPercents);
+        var mergedIndices = BuildSimplifiedIndexBuffers(newVertex, newIndics, normalizedPercents, target_errors);
         return ToMesh(newVertex, mergedIndices);
     }
 
@@ -190,13 +190,14 @@ public class SimpleMeshOpt : IMeshOpt
         return output;
     }
 
-    private uint[][] BuildSimplifiedIndexBuffers(SimpleMeshData[] vertices, uint[] sourceIndices, IReadOnlyList<int> percents)
+    private uint[][] BuildSimplifiedIndexBuffers(SimpleMeshData[] vertices, uint[] sourceIndices, IReadOnlyList<int> percents, IReadOnlyList<float> target_errors)
     {
         var mergedIndices = new uint[percents.Count][];
         for (var index = 0; index < percents.Count; index++)
         {
             var percent = percents[index];
-            mergedIndices[index] = MeshOperations.Simplify(sourceIndices, vertices, sizeOfElement, (uint)(sourceIndices.Length * percent / 100.0f), 0.01f, 0, out var error);
+            float error_target = target_errors != null && target_errors.Count > index ? target_errors[index] : 0.01f;
+            mergedIndices[index] = MeshOperations.Simplify(sourceIndices, vertices, sizeOfElement, (uint)(sourceIndices.Length * percent / 100.0f), error_target, 0, out var error);
         }
 
         return mergedIndices;

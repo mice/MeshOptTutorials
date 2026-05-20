@@ -77,6 +77,10 @@ dotnet build Assembly-CSharp-Editor.csproj
   - `GetBonesPerVertex().Length == vertexCount`
   - legacy `boneWeights.Length == vertexCount`
   - maximum 4 bone influences per vertex
+- When discussing or extending skinned simplification, explicitly distinguish between these two reduction modes:
+  - **vertex-reduction mode**: simplification is allowed to reduce both vertex count and triangle count
+  - **locked-vertex mode**: simplification keeps the original vertex set fixed and only reduces triangle/index data
+- Do not treat those two modes as interchangeable in plans, UI, metrics, or validation. If a task says "skin simplification" or "skin reduction", first make clear which mode is actually in scope.
 - Treat skinned simplification as a **character / monster LOD tool**, not a general animated-mesh simplifier. Current docs assume UV0-only support for the skinned path.
 - Generated output meshes are created as sibling `.mesh` assets with suffixes such as `_fixed`, `_skin_fixed`, `_075`, `_050`, `_025`, and `_lod`. Reuse that naming convention for new output variants.
 - `OptimAndReplace` is intentionally restricted to native `.mesh` assets. For imported FBX meshes, create a new asset instead of mutating the importer output in place.

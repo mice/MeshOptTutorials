@@ -125,7 +125,7 @@ namespace MeshOptimizer
             Array.Copy(newIdx, newIdx2, newSize);
             return newIdx2;
         }
-        //工作有点奇怪,
+
         public static uint[] GenerateShadowIndexBuffer<T>(uint[] Indices, T[] Vertices, uint VertexSize,uint VertexStride)
         {
             var newIdx = new uint[(int)(Indices.Length)];

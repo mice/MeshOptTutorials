@@ -9,9 +9,9 @@ using UnityEngine;
 public interface IMeshOpt
 {
     void Init(Mesh mesh);
-    Mesh Simplify(int percent);
+    Mesh Simplify(int percent, float target_error = 0.01f);
     Mesh Optimize();
-    Mesh MergeSimplified(params int[] percents);
+    Mesh MergeSimplified(int[] percents, float[] target_errors);
 
     Mesh MergeLOD();
 }
@@ -19,6 +19,7 @@ public interface IMeshOpt
 public static partial class MeshEditorUtils
 {
     private static readonly int[] DefaultMergedSimplifyPercents = { 80, 45, 20 };
+    private static readonly float[] DefaultMergedSimplifyTargetErrors = { 0.01f, 0.01f, 0.01f };
 
     [MenuItem("Assets/mesh/(danger)OptimAndReplace")]
     private static void Editor_ConvMeshReplace()
@@ -85,7 +86,7 @@ public static partial class MeshEditorUtils
         var simpleMeshEditor = new SimpleMeshOpt();
         simpleMeshEditor.Init(mesh);
 
-        var newMesh = simpleMeshEditor.MergeSimplified(DefaultMergedSimplifyPercents);
+        var newMesh = simpleMeshEditor.MergeSimplified(DefaultMergedSimplifyPercents, null);
         AssetDatabase.CreateAsset(newMesh, BuildGeneratedMeshPath(path, "_lod_804520"));
     }
 
