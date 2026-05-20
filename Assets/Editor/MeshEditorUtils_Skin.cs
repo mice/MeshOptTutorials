@@ -84,7 +84,7 @@ public static partial class MeshEditorUtils
         var simpleMeshEditor = new SkinMeshOpt();
         simpleMeshEditor.Init(mesh);
 
-        var newMesh = simpleMeshEditor.MergeSimplified(DefaultMergedSimplifyPercents);
+        var newMesh = simpleMeshEditor.MergeSimplified(DefaultMergedSimplifyPercents, null);
         AssetDatabase.CreateAsset(newMesh, BuildGeneratedMeshPath(path, "_skin_lod_804520"));
     }
 
